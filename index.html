@@ -1471,6 +1471,7 @@ async function loadFromCloud() {
     }
     stamps = stampsMap[getTodayStr()] || 0;
     growthLevel = stamps;
+    _lastDateStr = getTodayStr();
     history = d.history || [];
     todos = d.todos || [];
     playlist = d.playlist || [];
@@ -2145,7 +2146,7 @@ setInterval(() => {
 }, 5000);
 
 // ===== 시계 + 자정 체크 =====
-let _lastDateStr = '';
+let _lastDateStr = getTodayStr();
 function updateClock() {
   const now = new Date();
   const h = now.getHours().toString().padStart(2,'0');
@@ -2159,13 +2160,13 @@ function updateClock() {
 
   // 자정 지나면 오늘 stamps 새로 로드
   const todayStr = getTodayStr();
-  if (_lastDateStr && _lastDateStr !== todayStr) {
+  if (_lastDateStr !== todayStr) {
+    _lastDateStr = todayStr;
     stamps = stampsMap[todayStr] || 0;
     growthLevel = stamps;
     buildStamps(); buildGarden();
     showToast('🌅 새로운 하루 시작! 오늘도 화이팅, 민아야!');
   }
-  _lastDateStr = todayStr;
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -2300,9 +2301,20 @@ function renderHistory() {
 
 function deleteHistory(index) {
   history.splice(index, 1);
+  recalcTodayStamps();
   renderHistory();
   renderCalendar();
   saveToCloud();
+}
+
+function recalcTodayStamps() {
+  const today = getTodayStr();
+  const todayCount = history.filter(h => h.date === today).length;
+  stamps = todayCount;
+  stampsMap[today] = todayCount;
+  growthLevel = stamps;
+  buildStamps();
+  buildGarden();
 }
 
 // ===== 달력 =====
