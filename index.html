@@ -772,6 +772,78 @@
   .archive-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--mint); flex-shrink: 0; }
   .archive-dot.done { background: var(--gray-light); }
 
+  .todo-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 8px; border-radius: 8px;
+    background: rgba(224,58,58,0.04);
+    border: 1px solid rgba(224,58,58,0.12);
+    transition: all 0.2s; font-size: 0.72rem;
+    cursor: grab; user-select: none;
+  }
+  .todo-item:active { cursor: grabbing; }
+  .todo-item.dragging { opacity: 0.4; transform: scale(0.98); }
+  .todo-item.drag-over { border-color: var(--mint); background: rgba(224,58,58,0.1); }
+  .todo-drag-handle { color: var(--gray-light); font-size: 0.7rem; cursor: grab; flex-shrink: 0; padding: 0 2px; }
+
+  /* ===== 커스텀 타이머 모달 ===== */
+  .custom-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.3); backdrop-filter: blur(4px);
+    z-index: 9002; display: none; align-items: center; justify-content: center;
+  }
+  .custom-modal-overlay.open { display: flex; }
+  .custom-modal {
+    background: white; border-radius: 20px; padding: 24px; width: 280px;
+    box-shadow: 0 12px 40px rgba(224,58,58,0.2);
+    border: 1.5px solid rgba(224,58,58,0.15);
+  }
+  .custom-modal h3 { font-family: 'Noto Serif JP',serif; font-size: 0.9rem; color: var(--mint-dark); margin-bottom: 16px; text-align: center; }
+  .custom-field { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .custom-field label { font-size: 0.7rem; color: var(--gray); font-weight: 600; }
+  .custom-field-input { display: flex; align-items: center; gap: 6px; }
+  .custom-num-input {
+    width: 52px; padding: 6px 8px;
+    border: 1.5px solid rgba(224,58,58,0.25); border-radius: 8px;
+    font-family: inherit; font-size: 0.82rem; font-weight: 700;
+    text-align: center; outline: none; color: var(--mint-dark);
+    background: var(--mint-pale); transition: border-color 0.2s;
+  }
+  .custom-num-input:focus { border-color: var(--mint); }
+  .custom-start-btn {
+    width: 100%; padding: 10px 0; margin-top: 6px;
+    background: var(--mint); color: white; border: none; border-radius: 12px;
+    font-family: 'M PLUS Rounded 1c',sans-serif; font-size: 0.78rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; box-shadow: 0 3px 12px rgba(224,58,58,0.3);
+  }
+  .custom-start-btn:hover { background: var(--mint-dark); transform: translateY(-1px); }
+
+  /* ===== 방명록 ===== */
+  .guestbook-item {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 8px 10px; border-radius: 10px;
+    background: rgba(224,58,58,0.04); border: 1px solid rgba(224,58,58,0.12);
+  }
+  .guestbook-nick { font-size: 0.68rem; font-weight: 700; color: var(--mint-dark); }
+  .guestbook-msg { font-size: 0.65rem; color: var(--black); line-height: 1.5; word-break: keep-all; }
+  .guestbook-meta { font-size: 0.56rem; color: var(--gray-light); display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+  .guestbook-actions { display: flex; gap: 4px; }
+  .gb-btn { background: none; border: none; cursor: pointer; font-size: 0.6rem; color: var(--gray-light); padding: 0; transition: color 0.15s; }
+  .gb-btn:hover { color: var(--mint-dark); }
+  .gb-btn.del:hover { color: var(--accent); }
+  .gb-input {
+    width: 100%; padding: 6px 10px;
+    border: 1.5px solid rgba(224,58,58,0.25); border-radius: 8px;
+    font-family: inherit; font-size: 0.68rem; outline: none;
+    background: white; color: var(--black); transition: border-color 0.2s; min-width: 0;
+  }
+  .gb-input:focus { border-color: var(--mint); }
+  .gb-submit {
+    width: 100%; padding: 7px 0; background: var(--mint); color: white;
+    border: none; border-radius: 8px; font-family: 'M PLUS Rounded 1c',sans-serif;
+    font-size: 0.7rem; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 2px;
+  }
+  .gb-submit:hover { background: var(--mint-dark); }
+
   /* ===== 기록 저장 버튼 ===== */
   .save-record-btn {
     width: 100%;
@@ -1189,6 +1261,7 @@
           <button class="mode-btn" onclick="setMode('focus',50,10,this)">🍅🍅 50/10</button>
           <button class="mode-btn" onclick="setMode('focus',90,15,this)">🔥 90/15</button>
           <button class="mode-btn" id="free-mode-btn" onclick="setFreeMode(this)">⏳ 자유</button>
+          <button class="mode-btn" id="custom-mode-btn" onclick="openCustomModal(this)">⚙️ 커스텀</button>
         </div>
 
         <div class="timer-wrapper">
@@ -1325,6 +1398,50 @@
           <div id="archive-day-detail" class="cal-detail"></div>
         </div>
       </div>
+
+      <!-- 방명록 -->
+      <div class="panel">
+        <div class="panel-title">💌 GUESTBOOK</div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;">
+          <input class="gb-input" id="gb-nick" placeholder="닉네임" maxlength="12">
+          <input class="gb-input" id="gb-msg" placeholder="한 줄 메모 남기기 ✨" maxlength="60" onkeydown="if(event.key==='Enter')submitGuestbook()">
+          <button class="gb-submit" onclick="submitGuestbook()">남기기 🐱</button>
+        </div>
+        <div id="guestbook-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div style="margin-top:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:4px 0;" onclick="toggleGbArchive()">
+            <span style="font-size:0.62rem;color:var(--gray);font-weight:600;">📂 전체 기록</span>
+            <span id="gb-archive-arrow" style="font-size:0.65rem;color:var(--gray);">▼</span>
+          </div>
+          <div id="gb-archive" style="display:none;margin-top:6px;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 커스텀 타이머 모달 -->
+  <div class="custom-modal-overlay" id="custom-modal">
+    <div class="custom-modal">
+      <h3>⚙️ 커스텀 타이머</h3>
+      <div class="custom-field">
+        <label>🍅 집중 시간</label>
+        <div class="custom-field-input">
+          <input class="custom-num-input" id="custom-work" type="number" min="1" max="180" value="30">
+          <span style="font-size:0.68rem;color:var(--gray);">분</span>
+        </div>
+      </div>
+      <div class="custom-field">
+        <label>☕ 휴식 시간</label>
+        <div class="custom-field-input">
+          <input class="custom-num-input" id="custom-break" type="number" min="1" max="60" value="10">
+          <span style="font-size:0.68rem;color:var(--gray);">분</span>
+        </div>
+      </div>
+      <div style="font-size:0.62rem;color:var(--gray);text-align:center;margin-bottom:10px;" id="custom-preview">30분 집중 / 10분 휴식</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="closeCustomModal()" style="flex:1;padding:9px 0;border-radius:10px;border:1.5px solid rgba(0,0,0,0.1);background:white;font-family:inherit;font-size:0.72rem;font-weight:700;cursor:pointer;color:var(--gray);">취소</button>
+        <button class="custom-start-btn" onclick="applyCustomMode()" style="flex:2;margin-top:0;">시작하기 🍅</button>
+      </div>
     </div>
   </div>
 
@@ -1350,6 +1467,7 @@ let stampsMap = {}; // { 'YYYY-MM-DD': N } 날짜별 도장 수
 let history = [];
 let todos = [];
 let playlist = [];
+let guestbook = [];
 let currentTrack = -1;
 let ytPlayer = null;
 let growthLevel = 0;
@@ -1475,8 +1593,10 @@ async function loadFromCloud() {
     history = d.history || [];
     todos = d.todos || [];
     playlist = d.playlist || [];
+    guestbook = d.guestbook || [];
     buildStamps(); buildGarden();
-    renderHistory(); renderTodos(); renderPlaylist(); renderWeekly(); renderCalendar();
+    renderHistory(); renderTodos(); renderPlaylist(); renderWeekly(); renderCalendar(); renderGuestbook();
+    rolloverTodos();
     updateStudyStats();
     showSyncStatus('✅ 동기화 완료');
     setTimeout(() => showSyncStatus(''), 2000);
@@ -1494,7 +1614,7 @@ async function saveToCloud() {
     await fetch(`${JSONBIN_URL}/${currentBinId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-      body: JSON.stringify({ stampsMap, stamps, history, todos, playlist })
+      body: JSON.stringify({ stampsMap, stamps, history, todos, playlist, guestbook })
     });
     showSyncStatus('✅ 저장됨');
     setTimeout(() => showSyncStatus(''), 2000);
@@ -1595,7 +1715,7 @@ function init() {
     currentBinId = savedBinId;
     const el = document.getElementById('current-pin-display');
     if (el) el.textContent = `PIN: ${currentPin}`;
-    loadFromCloud().then(() => renderCalendar());
+    loadFromCloud().then(() => { renderCalendar(); rolloverTodos(); });
   } else if (savedPin) {
     loginWithPin(savedPin);
   } else {
@@ -2166,6 +2286,7 @@ function updateClock() {
     growthLevel = stamps;
     buildStamps(); buildGarden();
     showToast('🌅 새로운 하루 시작! 오늘도 화이팅, 민아야!');
+    rolloverTodos();
   }
 }
 setInterval(updateClock, 1000);
@@ -2275,7 +2396,8 @@ function addHistory() {
   const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
   const dateStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
   const modes = {25:'25/5', 50:'50/10', 90:'90/15'};
-  history.unshift({ time: timeStr, date: dateStr, mode: modes[workMin] || `${workMin}분`, stamp: stamps });
+  const modeLabel = modes[workMin] || `${workMin}/${breakMin}`;
+  history.unshift({ time: timeStr, date: dateStr, mode: modeLabel, stamp: stamps });
   renderHistory();
   renderCalendar();
   saveToCloud();
@@ -2553,63 +2675,187 @@ function addTodo() {
   const inp = document.getElementById('todo-input');
   const text = inp.value.trim();
   if (!text) return;
-  const today = getTodayStr();
-  todos.push({ text, done: false, id: Date.now(), date: today });
+  todos.push({ text, done: false, id: Date.now(), date: getTodayStr() });
   inp.value = '';
-  renderTodos();
-  saveToCloud();
+  renderTodos(); saveToCloud();
 }
 function toggleTodo(id) {
   const t = todos.find(t => t.id === id);
   if (t) t.done = !t.done;
-  renderTodos();
-  saveToCloud();
+  renderTodos(); saveToCloud();
 }
 function deleteTodo(id) {
   todos = todos.filter(t => t.id !== id);
-  renderTodos();
-  saveToCloud();
+  renderTodos(); saveToCloud();
 }
+
+function rolloverTodos() {
+  const today = getTodayStr();
+  let changed = false;
+  todos.forEach(t => { if (!t.done && t.date && t.date < today) { t.date = today; changed = true; } });
+  if (changed) { renderTodos(); saveToCloud(); }
+}
+
+let dragId = null, dragOverId = null;
+function onDragStart(e, id) {
+  dragId = id; e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => { const el = document.querySelector(`[data-id="${id}"]`); if (el) el.classList.add('dragging'); }, 0);
+}
+function onDragOver(e, id) {
+  e.preventDefault();
+  if (dragOverId !== id) {
+    document.querySelectorAll('.todo-item').forEach(el => el.classList.remove('drag-over'));
+    const el = document.querySelector(`[data-id="${id}"]`); if (el) el.classList.add('drag-over');
+    dragOverId = id;
+  }
+}
+function onDragEnd() {
+  document.querySelectorAll('.todo-item').forEach(el => el.classList.remove('dragging','drag-over'));
+  if (dragId !== null && dragOverId !== null && dragId !== dragOverId) {
+    const fi = todos.findIndex(t => t.id === dragId), ti = todos.findIndex(t => t.id === dragOverId);
+    if (fi !== -1 && ti !== -1) { const [item] = todos.splice(fi, 1); todos.splice(ti, 0, item); renderTodos(); saveToCloud(); }
+  }
+  dragId = null; dragOverId = null;
+}
+
 function renderTodos() {
   const list = document.getElementById('todo-list');
   if (!list) return;
   const today = getTodayStr();
-  // 오늘 것 먼저, 나머지는 날짜별로 묶어서
-  const todayTodos = todos.filter(t => !t.date || t.date === today);
+  const todayUndone = todos.filter(t => (!t.date || t.date === today) && !t.done);
+  const todayDone = todos.filter(t => (!t.date || t.date === today) && t.done);
+  const todayTodos = [...todayUndone, ...todayDone];
   const pastDates = [...new Set(todos.filter(t => t.date && t.date !== today).map(t => t.date))].sort().reverse();
-
   let html = '';
   if (todayTodos.length === 0 && pastDates.length === 0) {
     list.innerHTML = '<li style="font-size:0.65rem;color:var(--gray);text-align:center;padding:8px 0;">할 일을 추가해봐 😊</li>';
     return;
   }
-  // 오늘 할 일
   if (todayTodos.length > 0) {
     html += `<li style="font-size:0.58rem;color:var(--mint-dark);font-weight:700;padding:4px 2px 2px;letter-spacing:0.05em;">오늘</li>`;
     html += todayTodos.map(t =>
-      `<li class="todo-item">
-        <input type="checkbox" class="todo-check" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})">
-        <span class="todo-text ${t.done ? 'done' : ''}">${escHtml(t.text)}</span>
+      `<li class="todo-item" data-id="${t.id}" draggable="true"
+        ondragstart="onDragStart(event,${t.id})" ondragover="onDragOver(event,${t.id})" ondragend="onDragEnd()">
+        <span class="todo-drag-handle">⋮⋮</span>
+        <input type="checkbox" class="todo-check" ${t.done?'checked':''} onchange="toggleTodo(${t.id})">
+        <span class="todo-text ${t.done?'done':''}">${escHtml(t.text)}</span>
         <button class="todo-del" onclick="deleteTodo(${t.id})">✕</button>
-      </li>`
-    ).join('');
+      </li>`).join('');
   }
-  // 과거 날짜별
   pastDates.forEach(date => {
     const items = todos.filter(t => t.date === date);
-    const [y,m,d] = date.split('-');
-    html += `<li style="font-size:0.58rem;color:var(--gray);font-weight:700;padding:6px 2px 2px;letter-spacing:0.05em;">${parseInt(m)}/${parseInt(d)}</li>`;
+    const [,m,d] = date.split('-');
+    html += `<li style="font-size:0.58rem;color:var(--gray);font-weight:700;padding:6px 2px 2px;">${parseInt(m)}/${parseInt(d)}</li>`;
     html += items.map(t =>
       `<li class="todo-item" style="opacity:0.75;">
-        <input type="checkbox" class="todo-check" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})">
-        <span class="todo-text ${t.done ? 'done' : ''}">${escHtml(t.text)}</span>
+        <input type="checkbox" class="todo-check" ${t.done?'checked':''} onchange="toggleTodo(${t.id})">
+        <span class="todo-text ${t.done?'done':''}">${escHtml(t.text)}</span>
         <button class="todo-del" onclick="deleteTodo(${t.id})">✕</button>
-      </li>`
-    ).join('');
+      </li>`).join('');
   });
   list.innerHTML = html;
-  renderWeekly();
-  refreshArchiveCal();
+  renderWeekly(); refreshArchiveCal();
+}
+
+// ===== 커스텀 타이머 =====
+let customModeBtn = null;
+function openCustomModal(btn) { customModeBtn = btn; updateCustomPreview(); document.getElementById('custom-modal').classList.add('open'); }
+function closeCustomModal() { document.getElementById('custom-modal').classList.remove('open'); }
+function updateCustomPreview() {
+  const w = parseInt(document.getElementById('custom-work').value)||30;
+  const b = parseInt(document.getElementById('custom-break').value)||10;
+  const el = document.getElementById('custom-preview'); if (el) el.textContent = `${w}분 집중 / ${b}분 휴식`;
+}
+function applyCustomMode() {
+  const w = parseInt(document.getElementById('custom-work').value)||30;
+  const b = parseInt(document.getElementById('custom-break').value)||10;
+  if (w<1||w>180||b<1||b>60) { showToast('⚠️ 집중 1~180분, 휴식 1~60분!'); return; }
+  closeCustomModal();
+  if (isFreeMode) { stopFreeTimer(); isFreeMode = false; freeElapsed = 0; }
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  if (customModeBtn) customModeBtn.classList.add('active');
+  workMin = w; breakMin = b; isBreak = false;
+  totalSec = w * 60; elapsed = 0; stopTimer();
+  document.body.classList.remove('break-mode');
+  document.getElementById('timer-label').textContent = `집중 ${w}분 🍅`;
+  document.getElementById('timer-ring').style.stroke = '#E03A3A';
+  renderTimer();
+  showToast(`⚙️ ${w}분 집중 / ${b}분 휴식 세팅 완료!`);
+}
+document.addEventListener('input', e => { if (e.target.id==='custom-work'||e.target.id==='custom-break') updateCustomPreview(); });
+
+// ===== 방명록 =====
+let gbArchiveOpen = false;
+function toggleGbArchive() {
+  gbArchiveOpen = !gbArchiveOpen;
+  const el = document.getElementById('gb-archive'); const arrow = document.getElementById('gb-archive-arrow');
+  if (el) el.style.display = gbArchiveOpen ? 'flex' : 'none';
+  if (arrow) arrow.textContent = gbArchiveOpen ? '▲' : '▼';
+  if (gbArchiveOpen) renderGbArchive();
+}
+function renderGbArchive() {
+  const el = document.getElementById('gb-archive'); if (!el) return;
+  const today = getTodayStr();
+  const past = guestbook.filter(g => g.dateStr && g.dateStr !== today);
+  if (past.length === 0) { el.innerHTML = '<div style="font-size:0.62rem;color:var(--gray-light);text-align:center;padding:8px 0;">과거 기록 없음</div>'; return; }
+  const groups = {};
+  past.forEach(g => { const key = g.dateStr||'날짜없음'; if (!groups[key]) groups[key]=[]; groups[key].push(g); });
+  el.innerHTML = Object.keys(groups).sort().reverse().map(date => {
+    const [,m,d] = date.split('-');
+    return `<div style="font-size:0.58rem;color:var(--mint-dark);font-weight:700;padding:2px 0;">${parseInt(m)}월 ${parseInt(d)}일</div>` +
+      groups[date].map(g => `<div class="guestbook-item">
+        <div class="guestbook-nick">🐱 ${escHtml(g.nick)}</div>
+        <div class="guestbook-msg">${escHtml(g.msg)}</div>
+        <div class="guestbook-meta"><span>${g.date}${g.edited?' (수정됨)':''}</span>
+          <div class="guestbook-actions"><button class="gb-btn" onclick="editGuestbook(${g.id})">✏️</button><button class="gb-btn del" onclick="deleteGuestbook(${g.id})">✕</button></div>
+        </div></div>`).join('');
+  }).join('');
+}
+function renderGuestbook() {
+  const list = document.getElementById('guestbook-list'); if (!list) return;
+  const today = getTodayStr();
+  const todayItems = guestbook.filter(g => !g.dateStr || g.dateStr === today);
+  list.innerHTML = todayItems.length === 0
+    ? '<div style="font-size:0.62rem;color:var(--gray-light);text-align:center;padding:8px 0;">오늘 방명록이 없어요 💌</div>'
+    : todayItems.map(g => `<div class="guestbook-item">
+        <div class="guestbook-nick">🐱 ${escHtml(g.nick)}</div>
+        <div class="guestbook-msg">${escHtml(g.msg)}</div>
+        <div class="guestbook-meta"><span>${g.date}${g.edited?' (수정됨)':''}</span>
+          <div class="guestbook-actions"><button class="gb-btn" onclick="editGuestbook(${g.id})">✏️</button><button class="gb-btn del" onclick="deleteGuestbook(${g.id})">✕</button></div>
+        </div></div>`).join('');
+  if (gbArchiveOpen) renderGbArchive();
+}
+let editingGbId = null;
+function submitGuestbook() {
+  const nick = document.getElementById('gb-nick').value.trim();
+  const msg = document.getElementById('gb-msg').value.trim();
+  if (!nick) { document.getElementById('gb-nick').focus(); return; }
+  if (!msg) { document.getElementById('gb-msg').focus(); return; }
+  if (editingGbId !== null) {
+    const item = guestbook.find(g => g.id === editingGbId);
+    if (item) { item.nick = nick; item.msg = msg; item.edited = true; }
+    editingGbId = null; document.getElementById('gb-submit').textContent = '남기기 🐱';
+  } else {
+    const now = new Date();
+    const dateStr = getTodayStr();
+    const timeStr = `${now.getMonth()+1}/${now.getDate()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    guestbook.unshift({ id: Date.now(), nick, msg, date: timeStr, dateStr });
+  }
+  document.getElementById('gb-nick').value = ''; document.getElementById('gb-msg').value = '';
+  renderGuestbook(); saveToCloud();
+}
+function editGuestbook(id) {
+  const item = guestbook.find(g => g.id === id); if (!item) return;
+  editingGbId = id;
+  document.getElementById('gb-nick').value = item.nick;
+  document.getElementById('gb-msg').value = item.msg;
+  document.getElementById('gb-submit').textContent = '수정 완료 ✏️';
+  document.getElementById('gb-nick').focus();
+}
+function deleteGuestbook(id) {
+  guestbook = guestbook.filter(g => g.id !== id);
+  if (editingGbId === id) { editingGbId = null; document.getElementById('gb-nick').value=''; document.getElementById('gb-msg').value=''; document.getElementById('gb-submit').textContent='남기기 🐱'; }
+  renderGuestbook(); saveToCloud();
 }
 
 // ===== 자유형 타이머 =====
