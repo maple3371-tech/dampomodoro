@@ -1203,6 +1203,15 @@
       <div class="pin-emoji">🏐</div>
       <h2>POMODORO</h2>
       <p class="pin-desc">숫자 4자리를 입력해줘!<br>같은 번호로 어느 기기든 동기화돼 😊</p>
+      <div id="token-row" style="margin-bottom:10px;display:none;">
+        <input
+          id="token-input"
+          type="password"
+          placeholder="GitHub Token (ghp_...)"
+          style="width:100%;padding:10px;border:1.5px solid rgba(224,58,58,0.3);border-radius:10px;font-size:0.72rem;outline:none;font-family:inherit;background:var(--mint-pale);color:var(--mint-dark);box-sizing:border-box;"
+        >
+        <div style="font-size:0.58rem;color:var(--gray);margin-top:4px;text-align:center;">처음 한 번만 입력하면 저장돼요 🔑</div>
+      </div>
       <input
         class="pin-input-field"
         id="pin-input"
@@ -1474,93 +1483,85 @@ let growthLevel = 0;
 
 const CIRCUMFERENCE = 2 * Math.PI * 124;
 
-// ===== JSONBIN PIN 동기화 =====
-const JSONBIN_KEY = '$2a$10$iRslNAcssDnvKXQXkOseAOmP2A3cwxLdgbKwPcXCzUeZ4bCJxJAAW';
-const JSONBIN_URL = 'https://api.jsonbin.io/v3/b';
-// PIN → Bin ID 매핑을 별도 마스터 빈에 저장
-// 마스터 빈 ID: 처음 실행 시 생성되어 고정 저장됨
-const MASTER_BIN_ID_KEY = 'kuroo_master_bin';
-let MASTER_BIN_ID = '6a01538b250b1311c3312801'; // 고정 마스터빈
-localStorage.setItem(MASTER_BIN_ID_KEY, MASTER_BIN_ID);
-let currentPin = null;
-let currentBinId = null;
-let isSyncing = false;
-let pinMap = {}; // { '1234': 'binId...' }
+// ===== GITHUB GIST 동기화 =====
+const GIST_API = 'https://api.github.com/gists';
+function getGistHeaders() {
+  const token = localStorage.getItem('kuroo_gh_token') || '';
+  return {
+    'Authorization': `token ${token}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/vnd.github.v3+json'
+  };
+}
 
-// 마스터 빈 초기화 (PIN→BinID 맵 저장용)
-async function initMasterBin() {
-  if (MASTER_BIN_ID) {
-    // 마스터 빈 불러오기
+let currentPin = null;
+let currentGistId = null;
+let isSyncing = false;
+let pinMap = {};
+let masterGistId = localStorage.getItem('kuroo_master_gist') || null;
+
+async function initMasterGist() {
+  if (masterGistId) {
     try {
-      const res = await fetch(`${JSONBIN_URL}/${MASTER_BIN_ID}/latest`, {
-        headers: { 'X-Master-Key': JSONBIN_KEY }
-      });
+      const res = await fetch(`${GIST_API}/${masterGistId}`, { headers: getGistHeaders() });
       const data = await res.json();
-      pinMap = data.record || {};
+      pinMap = JSON.parse(data.files['kuroo-pins.json'].content || '{}');
     } catch(e) { pinMap = {}; }
   } else {
-    // 마스터 빈 새로 생성
     try {
-      const res = await fetch(JSONBIN_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': JSONBIN_KEY,
-          'X-Bin-Name': 'kuroo-pin-map',
-          'X-Bin-Private': 'false'
-        },
-        body: JSON.stringify({})
+      const res = await fetch(GIST_API, {
+        method: 'POST', headers: getGistHeaders(),
+        body: JSON.stringify({
+          description: 'Kuroo Pomodoro PIN Map',
+          public: false,
+          files: { 'kuroo-pins.json': { content: '{}' } }
+        })
       });
       const data = await res.json();
-      MASTER_BIN_ID = data.metadata.id;
-      localStorage.setItem(MASTER_BIN_ID_KEY, MASTER_BIN_ID);
+      masterGistId = data.id;
+      localStorage.setItem('kuroo_master_gist', masterGistId);
       pinMap = {};
-    } catch(e) { console.error('마스터 빈 생성 실패', e); }
+    } catch(e) { console.error('마스터 Gist 생성 실패', e); }
   }
 }
 
 async function savePinMap() {
-  if (!MASTER_BIN_ID) return;
-  await fetch(`${JSONBIN_URL}/${MASTER_BIN_ID}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-    body: JSON.stringify(pinMap)
+  if (!masterGistId) return;
+  await fetch(`${GIST_API}/${masterGistId}`, {
+    method: 'PATCH', headers: getGistHeaders(),
+    body: JSON.stringify({ files: { 'kuroo-pins.json': { content: JSON.stringify(pinMap) } } })
   });
 }
 
 async function loginWithPin(pin) {
   showPinStatus('☁️ 확인 중...');
-  await initMasterBin();
+  await initMasterGist();
 
   if (pinMap[pin]) {
-    // 기존 PIN — 데이터 불러오기
-    currentBinId = pinMap[pin];
+    currentGistId = pinMap[pin];
     currentPin = pin;
     localStorage.setItem('kuroo_pin', pin);
-    localStorage.setItem('kuroo_bin_id', currentBinId);
+    localStorage.setItem('kuroo_gist_id', currentGistId);
     const el = document.getElementById('current-pin-display');
     if (el) el.textContent = `PIN: ${currentPin}`;
     await loadFromCloud();
     closePinModal();
   } else {
-    // 새 PIN — 새 빈 생성
     try {
-      const res = await fetch(JSONBIN_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': JSONBIN_KEY,
-          'X-Bin-Name': `kuroo-${pin}`,
-          'X-Bin-Private': 'false'
-        },
-        body: JSON.stringify({ stamps: 0, history: [], todos: [], playlist: [] })
+      const res = await fetch(GIST_API, {
+        method: 'POST', headers: getGistHeaders(),
+        body: JSON.stringify({
+          description: `Pomodoro PIN ${pin}`,
+          public: false,
+          files: { 'kuroo-data.json': { content: JSON.stringify({ stampsMap: {}, stamps: 0, history: [], todos: [], playlist: [], guestbook: [] }) } }
+        })
       });
       const data = await res.json();
-      currentBinId = data.metadata.id;
+      currentGistId = data.id;
       currentPin = pin;
-      pinMap[pin] = currentBinId;
+      pinMap[pin] = currentGistId;
       localStorage.setItem('kuroo_pin', pin);
-      localStorage.setItem('kuroo_bin_id', currentBinId);
+      localStorage.setItem('kuroo_gist_id', currentGistId);
       const el = document.getElementById('current-pin-display');
       if (el) el.textContent = `PIN: ${currentPin}`;
       await savePinMap();
@@ -1573,15 +1574,12 @@ async function loginWithPin(pin) {
 }
 
 async function loadFromCloud() {
-  if (!currentBinId) return;
+  if (!currentGistId) return;
   try {
     showSyncStatus('☁️ 불러오는 중...');
-    const res = await fetch(`${JSONBIN_URL}/${currentBinId}/latest`, {
-      headers: { 'X-Master-Key': JSONBIN_KEY }
-    });
+    const res = await fetch(`${GIST_API}/${currentGistId}`, { headers: getGistHeaders() });
     const data = await res.json();
-    const d = data.record;
-    // stamps를 날짜별 맵으로 저장 (하위호환: 기존 숫자면 오늘 날짜로 마이그레이션)
+    const d = JSON.parse(data.files['kuroo-data.json'].content || '{}');
     if (d.stampsMap) {
       stampsMap = d.stampsMap;
     } else if (typeof d.stamps === 'number' && d.stamps > 0) {
@@ -1607,14 +1605,15 @@ async function loadFromCloud() {
 }
 
 async function saveToCloud() {
-  if (!currentBinId || isSyncing) return;
+  if (!currentGistId || isSyncing) return;
   isSyncing = true;
   showSyncStatus('💾 저장 중...');
   try {
-    await fetch(`${JSONBIN_URL}/${currentBinId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-      body: JSON.stringify({ stampsMap, stamps, history, todos, playlist, guestbook })
+    await fetch(`${GIST_API}/${currentGistId}`, {
+      method: 'PATCH', headers: getGistHeaders(),
+      body: JSON.stringify({
+        files: { 'kuroo-data.json': { content: JSON.stringify({ stampsMap, stamps, history, todos, playlist, guestbook }) } }
+      })
     });
     showSyncStatus('✅ 저장됨');
     setTimeout(() => showSyncStatus(''), 2000);
@@ -1635,12 +1634,13 @@ function showPinStatus(msg) {
   if (el) el.textContent = msg;
 }
 
-// PIN 모달 열기/닫기
 function openPinModal() {
   document.getElementById('pin-modal').classList.add('open');
   document.getElementById('pin-input').value = '';
   showPinStatus('');
-  // 저장된 PIN 있으면 자동 채우기
+  const hasToken = !!localStorage.getItem('kuroo_gh_token');
+  const tokenRow = document.getElementById('token-row');
+  if (tokenRow) tokenRow.style.display = hasToken ? 'none' : 'block';
   const saved = localStorage.getItem('kuroo_pin');
   if (saved) document.getElementById('pin-input').value = saved;
   setTimeout(() => document.getElementById('pin-input').focus(), 100);
@@ -1648,7 +1648,6 @@ function openPinModal() {
 
 function closePinModal() {
   document.getElementById('pin-modal').classList.remove('open');
-  // 현재 PIN 표시 업데이트
   const el = document.getElementById('current-pin-display');
   if (el) el.textContent = currentPin ? `PIN: ${currentPin}` : '';
 }
@@ -1662,26 +1661,33 @@ function handlePinInput(e) {
 function submitPin() {
   const pin = document.getElementById('pin-input').value.replace(/\D/g,'');
   if (pin.length !== 4) { showPinStatus('⚠️ 숫자 4자리를 입력해줘!'); return; }
+  const tokenInput = document.getElementById('token-input');
+  if (tokenInput && tokenInput.value.trim()) {
+    localStorage.setItem('kuroo_gh_token', tokenInput.value.trim());
+  }
+  if (!localStorage.getItem('kuroo_gh_token')) {
+    showPinStatus('⚠️ GitHub 토큰을 입력해줘!');
+    const tokenRow = document.getElementById('token-row');
+    if (tokenRow) tokenRow.style.display = 'block';
+    return;
+  }
   loginWithPin(pin);
 }
 
 function clearCacheAndReset() {
-  if (!confirm('캐시를 초기화하고 PIN을 다시 입력할게요. 동기화 문제 해결용이에요!')) return;
+  if (!confirm('캐시를 초기화하고 PIN을 다시 입력할게요!')) return;
   localStorage.removeItem('kuroo_pin');
-  localStorage.removeItem('kuroo_bin_id');
-  currentPin = null;
-  currentBinId = null;
+  localStorage.removeItem('kuroo_gist_id');
+  currentPin = null; currentGistId = null;
   openPinModal();
 }
 
 function resetAllData() {
   if (!confirm('오늘 기록(도장, 히스토리)을 리셋할까? 다른 날 기록은 유지돼 🍅')) return;
   const today = getTodayStr();
-  // 오늘 stamps만 초기화
   stampsMap[today] = 0;
   stamps = 0;
   growthLevel = 0;
-  // 오늘 history만 제거
   history = history.filter(h => h.date !== today);
   buildStamps(); buildGarden(); renderHistory(); renderCalendar();
   saveToCloud();
@@ -1708,11 +1714,11 @@ function init() {
   updateStudyStats();
 
   const savedPin = localStorage.getItem('kuroo_pin');
-  const savedBinId = localStorage.getItem('kuroo_bin_id');
+  const savedGistId = localStorage.getItem('kuroo_gist_id');
 
-  if (savedPin && savedBinId) {
+  if (savedPin && savedGistId) {
     currentPin = savedPin;
-    currentBinId = savedBinId;
+    currentGistId = savedGistId;
     const el = document.getElementById('current-pin-display');
     if (el) el.textContent = `PIN: ${currentPin}`;
     loadFromCloud().then(() => { renderCalendar(); rolloverTodos(); });
