@@ -1498,7 +1498,8 @@ let currentPin = null;
 let currentGistId = null;
 let isSyncing = false;
 let pinMap = {};
-let masterGistId = localStorage.getItem('kuroo_master_gist') || null;
+let masterGistId = '0eeecf1ab9cca7a8e2d0ca9912918ae4';
+localStorage.setItem('kuroo_master_gist', masterGistId);
 
 async function initMasterGist() {
   if (masterGistId) {
